@@ -4,6 +4,8 @@ import os
 
 pygame.init()
 
+global player
+
 # Константы
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
@@ -29,6 +31,19 @@ music_playing = False
 
 
 def load_image(name, colorkey=None, scale=(TILE_SIZE, TILE_SIZE)):
+    """
+    Загружает изображение из директории data.
+
+    --Взята с учебника ЯЛ--
+
+    Args:
+        name (str): Имя файла изображения.
+        colorkey (tuple, optional): Цветовой ключ для прозрачности.
+        scale (tuple, optional): Размер для масштабирования изображения.
+
+    Returns:
+        pygame.Surface: Загруженное и масштабированное изображение.
+    """
     fullname = os.path.join("data", name)
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
@@ -53,15 +68,108 @@ floor_group = pygame.sprite.Group()
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
+        """
+        Инициализирует спрайт игрока.
+
+        Args:
+            pos_x (int): Координата x начальной позиции игрока.
+            pos_y (int): Координата y начальной позиции игрока.
+        """
         super().__init__(player_group, all_sprites)
-        self.image = load_image("player.png")
+        self.image = load_image("player.png", scale=(50, 50))
         self.rect = self.image.get_rect().move(
             TILE_SIZE * pos_x + 15, TILE_SIZE * pos_y + 5
         )
+        self.speed = 5
+        self.target_pos = None
+
+    def update(self):
+        """
+        Обновляет позицию игрока на основе целевой позиции.
+
+        --Логика частично позаимствована с документации pygame--
+        """
+        if self.target_pos:
+            dx = self.target_pos[0] - self.rect.x
+            dy = self.target_pos[1] - self.rect.y
+            distance = (dx**2 + dy**2) ** 0.5
+
+            if distance > self.speed:
+                move_x = dx / distance * self.speed
+                move_y = dy / distance * self.speed
+
+                intended_move_x = move_x
+                intended_move_y = move_y
+
+                self.rect.x += move_x
+                self.resolve_collisions(intended_move_x, 0)
+
+                self.rect.y += move_y
+                self.resolve_collisions(0, intended_move_y)
+
+                if move_x == 0 and move_y != 0:
+                    # Горизонтальное скольжение
+                    self.rect.x += intended_move_x
+                    if self.check_collisions():
+                        self.rect.x -= intended_move_x
+                elif move_y == 0 and move_x != 0:
+                    # Вертикальное скольжение
+                    self.rect.y += intended_move_y
+                    if self.check_collisions():
+                        self.rect.y -= intended_move_y
+            else:
+                self.rect.x = self.target_pos[0]
+                self.rect.y = self.target_pos[1]
+                self.target_pos = None
+
+    def check_collisions(self):
+        """
+        Проверяет столкновения со стенами и дверями.
+
+        Returns:
+            bool: True, если есть столкновение, False в противном случае.
+        """
+        return pygame.sprite.spritecollideany(
+            self, walls_group
+        ) or pygame.sprite.spritecollideany(self, doors_group)
+
+    def resolve_collisions(self, dx, dy):
+        """
+        Решает столкновения, выталкивая игрока из перекрывающих объектов.
+
+        --Логика частично позаимствована с документации pygame--
+
+        Args:
+            dx (int): Изменение координаты x.
+            dy (int): Изменение координаты y.
+        """
+        while True:
+            wall_collision = pygame.sprite.spritecollideany(self, walls_group)
+            door_collision = pygame.sprite.spritecollideany(self, doors_group)
+            collision_object = wall_collision or door_collision
+
+            if not collision_object:
+                break  # Больше нет столкновений
+
+            if dx > 0:  # Движение вправо
+                self.rect.right = collision_object.rect.left
+            elif dx < 0:  # Движение влево
+                self.rect.left = collision_object.rect.right
+            elif dy > 0:  # Движение вниз
+                self.rect.bottom = collision_object.rect.top
+            elif dy < 0:  # Движение вверх
+                self.rect.top = collision_object.rect.bottom
 
 
 class Wall(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
+        """
+        Инициализирует спрайт стены.
+
+        Args:
+            pos_x (int): Координата x позиции стены.
+            pos_y (int): Координата y позиции стены.
+        """
         super().__init__(walls_group, all_sprites)
         self.image = load_image("wall.png")
         self.rect = self.image.get_rect().move(TILE_SIZE * pos_x, TILE_SIZE * pos_y)
@@ -69,6 +177,13 @@ class Wall(pygame.sprite.Sprite):
 
 class Door(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
+        """
+        Инициализирует спрайт двери.
+
+        Args:
+            pos_x (int): Координата x позиции двери.
+            pos_y (int): Координата y позиции двери.
+        """
         super().__init__(doors_group, all_sprites)
         self.image = load_image("door.png")
         self.rect = self.image.get_rect().move(TILE_SIZE * pos_x, TILE_SIZE * pos_y)
@@ -76,6 +191,14 @@ class Door(pygame.sprite.Sprite):
 
 class Floor(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, color):
+        """
+        Инициализирует спрайт пола.
+
+        Args:
+            pos_x (int): Координата x позиции пола.
+            pos_y (int): Координата y позиции пола.
+            color (tuple): Цвет пола.
+        """
         super().__init__(floor_group, all_sprites)
         self.image = pygame.Surface((TILE_SIZE, TILE_SIZE))
         self.image.fill(color)
@@ -84,6 +207,14 @@ class Floor(pygame.sprite.Sprite):
 
 class Room:
     def __init__(self, pos_x, pos_y, enemies):
+        """
+        Инициализирует комнату.
+
+        Args:
+            pos_x (int): Координата x позиции комнаты.
+            pos_y (int): Координата y позиции комнаты.
+            enemies (list): Список врагов в комнате.
+        """
         self.pos_x = pos_x
         self.pos_y = pos_y
         self.enemies = enemies
@@ -91,12 +222,13 @@ class Room:
 
 def generate_level(level_num):
     """
-    Генерирует уровень на основе номера уровня
+    Генерирует уровень на основе номера уровня.
+
+    Args:
+        level_num (int): Номер уровня.
 
     Returns:
-        Кортеж (level, rooms), где:
-        level - двумерный массив, представляющий карту уровня.
-        rooms - список объектов Room, представляющих комнаты на уровне.
+        tuple: Кортеж, содержащий карту уровня и список комнат.
     """
     if level_num == 1:
         level = [
@@ -118,7 +250,7 @@ def generate_level(level_num):
         ]
 
     else:
-        # возвращаем пустой уровень
+        # Возвращаем пустой уровень
         return [], []
 
     return level, rooms
@@ -127,7 +259,11 @@ def generate_level(level_num):
 def draw_level(level):
     """
     Отрисовывает уровень на экране.
+
+    Args:
+        level (list): Карта уровня.
     """
+    global player
     for y, row in enumerate(level):
         for x, cell in enumerate(row):
             if cell == "#":
@@ -139,7 +275,8 @@ def draw_level(level):
             elif cell == "d":
                 Door(x, y)
             elif cell == "p":
-                Player(x, y)
+                coords = (x, y)
+    player = Player(coords[0], coords[1])
 
 
 def toggle_music():
@@ -158,8 +295,11 @@ def toggle_music():
 
 def show_start_screen():
     """
-    Отображает начальный экран с инструкциями и позволяет выбрать уровень или включить/выключить музыку.
-    Возвращает выбранный уровень.
+    Отображает начальный экран с инструкциями и позволяет пользователю выбрать уровень или включить/выключить музыку.
+
+
+    Returns:
+        int: Номер выбранного уровня.
     """
     background_image = pygame.image.load("data/background.png")
     background_image = pygame.transform.scale(
@@ -169,8 +309,10 @@ def show_start_screen():
     screen.blit(background_image, (0, 0))
 
     title_text = font.render("SOBOL: Assault", True, BLACK)
-    instruction_text = small_font.render("Press 1-5 to select level", True, BLACK)
-    music_text = small_font.render("Press M to toggle music", True, BLACK)
+    instruction_text = small_font.render("Нажмите 1-5 для выбора уровня", True, BLACK)
+    music_text = small_font.render(
+        "Нажмите M для включения/выключения музыки", True, BLACK
+    )
 
     title_rect = title_text.get_rect(topleft=(10, 10))
     instruction_rect = instruction_text.get_rect(topleft=(10, title_rect.bottom + 10))
@@ -213,6 +355,9 @@ def show_start_screen():
 def main_game(level_num):
     """
     Основной игровой цикл для выбранного уровня.
+
+    Args:
+        level_num (int): Номер уровня.
     """
     clock = pygame.time.Clock()
     running = True
@@ -222,13 +367,17 @@ def main_game(level_num):
         print(f"Уровень {level_num} не найден.")
         return
 
-    player = Player(1, 1)
     draw_level(level_map)
 
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                player.target_pos = (mouse_x, mouse_y)
+
+        player_group.update()
 
         screen.fill(WHITE)
         floor_group.draw(screen)
