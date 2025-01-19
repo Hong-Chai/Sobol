@@ -4,6 +4,8 @@ import os
 
 pygame.init()
 
+from levels import generate_level
+
 global player
 
 # Константы
@@ -242,42 +244,6 @@ class Room:
         self.enemies = enemies
 
 
-def generate_level(level_num):
-    """
-    Генерирует уровень на основе номера уровня.
-
-    Args:
-        level_num (int): Номер уровня.
-
-    Returns:
-        tuple: Кортеж, содержащий карту уровня и список комнат.
-    """
-    if level_num == 1:
-        level = [
-            "#####################",
-            "#bbbbbbbbpbbbbbbbbb#",
-            "#b##d########d####b#",
-            "#b#...#..........#b#",
-            "#b#...#..........#b#",
-            "#b#...############b#",
-            "#b#####...#......#b#",
-            "#b#.......#......#b#",
-            "#b#.......#......db#",
-            "#b#.......#......#b#",
-            "#bd.......#......###",
-            "####################",
-        ]
-        rooms = [
-            # TODO
-        ]
-
-    else:
-        # Возвращаем пустой уровень
-        return [], []
-
-    return level, rooms
-
-
 def draw_level(level):
     """
     Отрисовывает уровень на экране.
@@ -395,9 +361,22 @@ def main_game(level_num):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = event.pos
-                player.target_pos = (mouse_x, mouse_y)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                for door in doors_group:
+                    if door.rect.collidepoint(mouse_pos):
+                        dx = mouse_pos[0] - player.rect.x
+                        dy = mouse_pos[1] - player.rect.y
+                        distance = (dx**2 + dy**2) ** 0.5
+                        if distance > 90:
+                            player.target_pos = mouse_pos
+                        else:
+                            # TODO Assualt logic
+                            print("start SHTURM!")
+                        break
+                else:
+                    if player:
+                        player.target_pos = mouse_pos
 
         player_group.update()
 
