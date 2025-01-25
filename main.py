@@ -5,6 +5,8 @@ import os
 pygame.init()
 
 from levels import generate_level
+from assault_settings import get_assault_settings
+
 
 global player
 
@@ -424,8 +426,13 @@ def main_game(level_num):
                         if distance > 90:
                             player.target_pos = mouse_pos
                         else:
-                            # TODO Assualt logic
-                            print("start SHTURM!")
+                            lethal_mode, use_flashbang = get_assault_settings(level_num)
+                            if lethal_mode:
+                                print("Starting lethal assault!")
+                            else:
+                                print("Starting non-lethal assault!")
+                            if use_flashbang:
+                                print("Using flashbang!")
                         break
                 else:
                     if player:
