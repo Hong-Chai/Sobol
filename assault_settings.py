@@ -42,8 +42,10 @@ class AssaultSettingsWindow(QMainWindow):
         self.lethal_mode = False
         self.use_flashbang = False
         self.settings_accepted = False
+        self.start = False
 
     def accept_settings(self):
+        self.start = True
         self.lethal_mode = self.lethal_checkbox.isChecked()
         self.use_flashbang = self.flashbang_checkbox.isChecked()
         self.settings_accepted = True
@@ -62,4 +64,4 @@ def get_assault_settings(level_num):
     while not window.settings_accepted and window.isVisible():
         app.processEvents()
 
-    return window.lethal_mode, window.use_flashbang
+    return window.start, window.lethal_mode, window.use_flashbang

@@ -102,9 +102,10 @@ class Player(pygame.sprite.Sprite):
             pos_y (int): Координата y начальной позиции игрока.
         """
         super().__init__(player_group, all_sprites)
+
         self.frames = [
             load_image(f"player{i}.png", scale=(50, 50))
-            for i in range(1, 7)  # Load player1.png to player6.png
+            for i in range(1, 7)  # Загрузка player1.png до player6.png
         ]
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
@@ -131,6 +132,7 @@ class Player(pygame.sprite.Sprite):
                 else:
                     self.image = current_frame
         else:
+            # Сброс анимации на первый кадр, когда игрок стоит
             self.cur_frame = 0
             current_frame = self.frames[self.cur_frame]
             if not self.facing_right:
@@ -141,20 +143,10 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         """
         Обновляет позицию игрока на основе целевой позиции.
-
-        --Логика частично позаимствована с документации pygame--
         """
-        # Anti-bug
-        if (
-            self.rect.x < 0 + TILE_SIZE
-            or self.rect.x > SCREEN_WIDTH - TILE_SIZE
-            or self.rect.y < 0 + TILE_SIZE
-            or self.rect.y > SCREEN_HEIGHT - TILE_SIZE
-        ):
-            self.rect.x = 64
-            self.rect.y = 64
-
         if self.target_pos:
+            old_x, old_y = self.rect.x, self.rect.y  # старая позиция
+
             dx = self.target_pos[0] - self.rect.x
             dy = self.target_pos[1] - self.rect.y
             distance = (dx**2 + dy**2) ** 0.5
@@ -166,31 +158,31 @@ class Player(pygame.sprite.Sprite):
                 self.is_moving = True
                 move_x = dx / distance * self.speed
                 move_y = dy / distance * self.speed
-
-                intended_move_x = move_x
-                intended_move_y = move_y
-
+                # Попытка сдвинуть игрока по X
                 self.rect.x += move_x
-                self.resolve_collisions(intended_move_x, 0)
+                if self.check_collisions():
+                    self.rect.x -= move_x  # Откат, если столкновение
+                    move_x = 0  # Не удалось двигаться по X
 
+                # Попытка сдвинуть игрока по Y
                 self.rect.y += move_y
-                self.resolve_collisions(0, intended_move_y)
-
-                if move_x == 0 and move_y != 0:
-                    # Horizontal sliding
-                    self.rect.x += intended_move_x
-                    if self.check_collisions():
-                        self.rect.x -= intended_move_x
-                elif move_y == 0 and move_x != 0:
-                    # Vertical sliding
-                    self.rect.y += intended_move_y
-                    if self.check_collisions():
-                        self.rect.y -= intended_move_y
+                if self.check_collisions():
+                    self.rect.y -= move_y  # Откат, если столкновение
+                    move_y = 0  # Не удалось двигаться по Y
             else:
                 self.rect.x = self.target_pos[0]
                 self.rect.y = self.target_pos[1]
                 self.target_pos = None
                 self.is_moving = False
+
+            # Проверяем, произошло ли какое-либо движение
+            if self.rect.x == old_x and self.rect.y == old_y:
+                # Если позиция не изменилась, сбрасываем движение
+                self.target_pos = None
+                self.is_moving = False
+
+        else:
+            self.is_moving = False  # Нет цели для движения
 
         self.animate()
 
@@ -205,32 +197,17 @@ class Player(pygame.sprite.Sprite):
             self, walls_group
         ) or pygame.sprite.spritecollideany(self, doors_group)
 
-    def resolve_collisions(self, dx, dy):
+    def move_to(self, x, y):
         """
-        Решает столкновения, выталкивая игрока из перекрывающих объектов.
-
-        --Логика частично позаимствована с документации pygame--
+        Устанавливает целевую позицию для движения игрока.
 
         Args:
-            dx (int): Изменение координаты x.
-            dy (int): Изменение координаты y.
+            x (int): Целевая координата x (в пикселях).
+            y (int): Целевая координата y (в пикселях).
         """
-        while True:
-            wall_collision = pygame.sprite.spritecollideany(self, walls_group)
-            door_collision = pygame.sprite.spritecollideany(self, doors_group)
-            collision_object = wall_collision or door_collision
-
-            if not collision_object:
-                break  # Больше нет столкновений
-
-            if dx > 0:  # Движение вправо
-                self.rect.right = collision_object.rect.left
-            elif dx < 0:  # Движение влево
-                self.rect.left = collision_object.rect.right
-            elif dy > 0:  # Движение вниз
-                self.rect.bottom = collision_object.rect.top
-            elif dy < 0:  # Движение вверх
-                self.rect.top = collision_object.rect.bottom
+        # Проверяем, находится ли целевая позиция в пределах карты
+        if 0 <= x <= SCREEN_WIDTH and 0 <= y <= SCREEN_HEIGHT:
+            self.target_pos = (x, y)
 
 
 class Wall(pygame.sprite.Sprite):
@@ -426,13 +403,15 @@ def main_game(level_num):
                         if distance > 90:
                             player.target_pos = mouse_pos
                         else:
-                            lethal_mode, use_flashbang = get_assault_settings(level_num)
-                            if lethal_mode:
-                                print("Starting lethal assault!")
-                            else:
-                                print("Starting non-lethal assault!")
-                            if use_flashbang:
-                                print("Using flashbang!")
+                            start, lethal_mode, use_flashbang = get_assault_settings(
+                                level_num
+                            )
+                            if start:
+                                print(
+                                    f"Starting {"lethal" if lethal_mode else "non-lethal"} assault!"
+                                )
+                                if use_flashbang:
+                                    print("Using flashbang!")
                         break
                 else:
                     if player:
