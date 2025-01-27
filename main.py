@@ -2,6 +2,10 @@ import pygame
 import sys
 import os
 
+from random import randint
+
+import saves
+
 pygame.init()
 
 from levels import generate_level
@@ -17,17 +21,26 @@ FPS = 60
 TILE_SIZE = 64
 
 # Цвета
+RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
 
 # Создание окна
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+clock = pygame.time.Clock()
 pygame.display.set_caption("SOBOL: Assault")
 
 # Шрифты
+pygame.font.init()
+
+# main menu font
 font = pygame.font.Font(None, 74)
 small_font = pygame.font.Font(None, 36)
+
+# game over font
+font_large = pygame.font.Font(None, 72)
+font_small = pygame.font.Font(None, 45)
 
 # Музыка
 pygame.mixer.init()
@@ -89,6 +102,7 @@ all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
 walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
+act_doors_group = pygame.sprite.Group()
 floor_group = pygame.sprite.Group()
 
 
@@ -225,6 +239,9 @@ class Wall(pygame.sprite.Sprite):
 
 
 class Door(pygame.sprite.Sprite):
+    img = "door.png"
+    rotated = None
+
     def __init__(self, pos_x, pos_y, rotated=False):
         """
         Инициализирует спрайт двери.
@@ -235,12 +252,28 @@ class Door(pygame.sprite.Sprite):
             rotated (bool, optional): Ориентация двери (по умолчанию False - горизонтальная).
 
         """
-        super().__init__(doors_group, all_sprites)
+        self.rotated = rotated
+
+        super().__init__(act_doors_group, all_sprites, doors_group)
         if rotated:
-            self.image = pygame.transform.rotate(load_image("door.png"), 90)
+            self.image = pygame.transform.rotate(load_image(self.img), 90)
         else:
-            self.image = load_image("door.png")
+            self.image = load_image(self.img)
         self.rect = self.image.get_rect().move(TILE_SIZE * pos_x, TILE_SIZE * pos_y)
+
+    def change_img(self, img):
+        """
+        Изменяет изображение двери.
+
+        Args:
+            img (str): Новое изображение двери.
+        """
+        act_doors_group.remove(self)
+        self.img = img
+        if self.rotated:
+            self.image = pygame.transform.rotate(load_image(self.img), 90)
+        else:
+            self.image = load_image(self.img)
 
 
 class Floor(pygame.sprite.Sprite):
@@ -299,18 +332,15 @@ def draw_level(level):
     player = Player(coords[0], coords[1])
 
 
-def toggle_music():
+def toggle_music(file=-1, stop=False, loop=-1):
     """
     Включает или выключает музыку.
     """
-    global music_playing
-    if music_playing:
+    if stop:
         pygame.mixer.music.stop()
-        music_playing = False
     else:
-        pygame.mixer.music.load("data/main.mp3")
-        pygame.mixer.music.play(-1)
-        music_playing = True
+        pygame.mixer.music.load(f"data/{file}.mp3")
+        pygame.mixer.music.play(loop)
 
 
 def show_start_screen():
@@ -321,6 +351,8 @@ def show_start_screen():
     Returns:
         int: Номер выбранного уровня.
     """
+    user_level = saves.get_save()
+
     background_image = pygame.image.load("data/background.png")
     background_image = pygame.transform.scale(
         background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -329,19 +361,30 @@ def show_start_screen():
     screen.blit(background_image, (0, 0))
 
     title_text = font.render("SOBOL: Assault", True, BLACK)
-    instruction_text = small_font.render("Нажмите 1-5 для выбора уровня", True, BLACK)
-    music_text = small_font.render(
-        "Нажмите M для включения/выключения музыки", True, BLACK
-    )
+    instruction_text = small_font.render(f"Ваш уровень: {user_level}", True, BLACK)
+    instruction_text1 = small_font.render("Нажмите Р для начала игры", True, BLACK)
+    instruction_text2 = small_font.render("Нажмите R для сброса прогресса", True, BLACK)
+    music_text = small_font.render("Нажмите M для выключения музыки", True, BLACK)
 
     title_rect = title_text.get_rect(topleft=(10, 10))
     instruction_rect = instruction_text.get_rect(topleft=(10, title_rect.bottom + 10))
-    music_rect = music_text.get_rect(topleft=(10, instruction_rect.bottom + 10))
+    instruction1_rect = instruction_text1.get_rect(
+        topleft=(10, instruction_rect.bottom + 20)
+    )
+    instruction2_rect = instruction_text2.get_rect(
+        topleft=(10, instruction1_rect.bottom + 20)
+    )
+    music_rect = music_text.get_rect(topleft=(10, instruction2_rect.bottom + 20))
 
     screen.blit(title_text, title_rect)
     screen.blit(instruction_text, instruction_rect)
+    screen.blit(instruction_text1, instruction1_rect)
+    screen.blit(instruction_text2, instruction2_rect)
+
     screen.blit(music_text, music_rect)
     pygame.display.flip()
+
+    toggle_music("main")
 
     waiting = True
     level_selected = None
@@ -351,25 +394,98 @@ def show_start_screen():
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1:
-                    level_selected = 1
+                if event.key == pygame.K_p:
+                    level_selected = user_level
                     waiting = False
-                elif event.key == pygame.K_2:
+                elif event.key == pygame.K_r:
                     level_selected = 2
                     waiting = False
-                elif event.key == pygame.K_3:
-                    level_selected = 3
-                    waiting = False
-                elif event.key == pygame.K_4:
-                    level_selected = 4
-                    waiting = False
-                elif event.key == pygame.K_5:
-                    level_selected = 5
-                    waiting = False
                 elif event.key == pygame.K_m:
-                    toggle_music()
+                    toggle_music(stop=1)
 
     return level_selected
+
+
+def clear_groups():
+    """
+    Очищает все группы спрайтов.
+    """
+    all_sprites.empty()
+    player_group.empty()
+    walls_group.empty()
+    doors_group.empty()
+    floor_group.empty()
+
+
+def to_black():
+    """
+    Переход к черному экрану
+    """
+    transition_duration = 2
+    transition_frames = transition_duration * FPS
+    transition_step = 255 / transition_frames
+    current_alpha = 0
+    for i in range(120):
+        current_alpha += transition_step
+        if current_alpha >= 255:
+            current_alpha = 255
+
+        screen.fill(WHITE)
+        all_sprites.draw(screen)
+
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.fill((0, 0, 0))
+        overlay.set_alpha(current_alpha)
+        screen.blit(overlay, (0, 0))
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def to_white():
+    """
+    Переход к белому экрану
+    """
+    transition_duration = 2
+    transition_frames = transition_duration * FPS
+    transition_step = 255 / transition_frames
+    current_alpha = 255
+    for i in range(120):
+        current_alpha -= transition_step
+        if current_alpha <= 0:
+            current_alpha = 0
+
+        screen.fill(WHITE)
+        all_sprites.draw(screen)
+
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.fill((0, 0, 0))
+        overlay.set_alpha(current_alpha)
+        screen.blit(overlay, (0, 0))
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def game_over_screen():
+    """
+    Вывод надписи о поражении
+    """
+    screen.fill(BLACK)
+
+    text_large = font_large.render("YOU DIED", True, RED)
+    text_rect_large = text_large.get_rect(
+        center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 10)
+    )
+    screen.blit(text_large, text_rect_large)
+
+    text_small = font_small.render("нажми ESC для главного меню", True, RED)
+    text_rect_small = text_small.get_rect(
+        center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)
+    )
+    screen.blit(text_small, text_rect_small)
+
+    pygame.display.flip()
 
 
 def main_game(level_num):
@@ -379,7 +495,14 @@ def main_game(level_num):
     Args:
         level_num (int): Номер уровня.
     """
-    clock = pygame.time.Clock()
+    toggle_music(f"intro{level_num}", loop=1)
+
+    FRAG = 2
+    SCOUT = 2
+    ROOMS_OK = 0
+
+    global player
+
     running = True
 
     level_map, rooms = generate_level(level_num)
@@ -393,9 +516,13 @@ def main_game(level_num):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    clear_groups()
+                    return
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-                for door in doors_group:
+                for door in act_doors_group:
                     if door.rect.collidepoint(mouse_pos):
                         dx = mouse_pos[0] - player.rect.x
                         dy = mouse_pos[1] - player.rect.y
@@ -403,15 +530,34 @@ def main_game(level_num):
                         if distance > 90:
                             player.target_pos = mouse_pos
                         else:
-                            start, lethal_mode, use_flashbang = get_assault_settings(
-                                level_num
+                            enemies = 2
+                            start, bonus, FRAG, SCOUT = get_assault_settings(
+                                level_num, FRAG, SCOUT, ROOMS_OK, enemies
                             )
+                            print(start)
                             if start:
-                                print(
-                                    f"Starting {"lethal" if lethal_mode else "non-lethal"} assault!"
-                                )
-                                if use_flashbang:
-                                    print("Using flashbang!")
+                                toggle_music("assualt", loop=1)
+                                to_black()
+                                pygame.time.wait(11000)
+                                if start <= randint(1, 100):
+                                    print("You died!")
+                                    toggle_music("fail", loop=1)
+                                    pygame.time.wait(5000)
+                                    game_over_screen()
+                                    while 1:
+                                        for event in pygame.event.get():
+                                            if event.type == pygame.QUIT:
+                                                pygame.quit()
+                                            elif event.type == pygame.KEYDOWN:
+                                                if event.key == pygame.K_ESCAPE:
+                                                    clear_groups()
+                                                    return
+                                else:
+                                    ROOMS_OK += 1
+                                    door.change_img("line.png")
+                                    toggle_music("ok", loop=1)
+                                    to_white()
+
                         break
                 else:
                     if player:
@@ -420,7 +566,6 @@ def main_game(level_num):
         player_group.update()
 
         screen.fill(WHITE)
-        floor_group.draw(screen)
         all_sprites.draw(screen)
         pygame.display.flip()
         clock.tick(FPS)

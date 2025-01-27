@@ -8,53 +8,78 @@ from PyQt6.QtWidgets import (
     QLabel,
 )
 from PyQt6.QtCore import Qt
+from PyQt6 import uic
 
 import sys
 
 app = QApplication(sys.argv)
 
 
-class AssaultSettingsWindow(QMainWindow):
-    def __init__(self, level_num):
+class AssaultSettingsWindow(QWidget):
+    def __init__(self, level_num, frag_cnt, scout_cnt, rooms_ok_cnt, enem):
         super().__init__()
         self.setWindowTitle("Assault Settings")
-        self.setFixedSize(300, 200)
+        self.setFixedSize(690, 300)
 
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        # central_widget = QWidget()
+        # self.setCentralWidget(self)
+        uic.loadUi("widget.ui", self)
 
-        title_label = QLabel("Configure Assault Settings")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
-
-        self.lethal_checkbox = QCheckBox("Lethal Mode")
-        layout.addWidget(self.lethal_checkbox)
-
-        self.flashbang_checkbox = QCheckBox("Use Flashbang")
-        self.flashbang_checkbox.setEnabled(level_num >= 2)
-        layout.addWidget(self.flashbang_checkbox)
-
-        self.confirm_button = QPushButton("Confirm")
-        self.confirm_button.clicked.connect(self.accept_settings)
-        layout.addWidget(self.confirm_button)
-
-        self.lethal_mode = False
-        self.use_flashbang = False
+        self.level_num = level_num
+        self.frag_cnt = frag_cnt
+        self.scout_cnt = scout_cnt
+        self.rooms_ok_cnt = rooms_ok_cnt
         self.settings_accepted = False
-        self.start = False
+        self.chance = 100
+        self.enem = enem
+
+        self.exit_but.clicked.connect(self.close)
+        self.start_but.clicked.connect(self.accept_settings)
+
+        if level_num < 2:
+            self.scout_cnt = 0
+            self.scout_but.setEnabled(0)
+            self.scout_but.setStyleSheet("background-color: #8a8a8a")
+        self.scout_cnt_l.setText(f"Осталось {str(self.scout_cnt)} разведок")
+
+        if level_num < 3:
+            self.m1.setText("НЕДОСТУПНО")
+            self.m2.setText("НЕДОСТУПНО")
+        else:
+            if rooms_ok_cnt >= 2:
+                self.m1.setText("ДОСТУПНО")
+                self.chance += 10
+            else:
+                self.m1.setText(f"Прогресс {rooms_ok_cnt}/2")
+            if rooms_ok_cnt >= 4:
+                self.m2.setText("ДОСТУПНО")
+                self.chance += 20
+            else:
+                self.m2.setText(f"Прогресс {rooms_ok_cnt}/4")
+
+        if level_num < 4:
+            self.frag_box.setEnabled(0)
+            self.frag_box.setStyleSheet("background-color: #8a8a8a")
+            self.frag_box.setText("НЕДОСТУПНО")
+        else:
+            self.frag_box.setText(f"Осталось {str(self.frag_cnt)} FRAG")
 
     def accept_settings(self):
-        self.start = True
-        self.lethal_mode = self.lethal_checkbox.isChecked()
-        self.use_flashbang = self.flashbang_checkbox.isChecked()
+        self.bonus = self.lethal_box.isChecked()
+        if self.bonus:
+            self.chance -= 20
+        self.use_frag = self.frag_box.isChecked()
+        if self.use_frag:
+            self.chance += 30
+            self.frag_cnt -= 1
+        self.chance -= self.enem * 10
         self.settings_accepted = True
         self.close()
 
 
-def get_assault_settings(level_num):
+def get_assault_settings(level_num, frag_cnt, scout_cnt, rooms_ok_cnt, enem):
     """Show assault settings window and return the selected options"""
-    window = AssaultSettingsWindow(level_num)
+    window = AssaultSettingsWindow(level_num, frag_cnt, scout_cnt, rooms_ok_cnt, enem)
     window.show()
 
     app = QApplication.instance()
@@ -64,4 +89,9 @@ def get_assault_settings(level_num):
     while not window.settings_accepted and window.isVisible():
         app.processEvents()
 
-    return window.start, window.lethal_mode, window.use_flashbang
+    return (
+        window.chance,
+        window.bonus,
+        window.frag_cnt,
+        window.scout_cnt,
+    )
