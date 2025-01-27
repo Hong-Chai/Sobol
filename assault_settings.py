@@ -30,7 +30,8 @@ class AssaultSettingsWindow(QWidget):
         self.scout_cnt = scout_cnt
         self.rooms_ok_cnt = rooms_ok_cnt
         self.settings_accepted = False
-        self.chance = 100
+        self.bonus = False
+        self.chance = 0
         self.enem = enem
 
         self.exit_but.clicked.connect(self.close)
@@ -65,6 +66,7 @@ class AssaultSettingsWindow(QWidget):
             self.frag_box.setText(f"Осталось {str(self.frag_cnt)} FRAG")
 
     def accept_settings(self):
+        self.chance = 100
         self.bonus = self.lethal_box.isChecked()
         if self.bonus:
             self.chance -= 20
