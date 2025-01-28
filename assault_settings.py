@@ -58,7 +58,7 @@ class AssaultSettingsWindow(QWidget):
             else:
                 self.m2.setText(f"Прогресс {rooms_ok_cnt}/4")
 
-        if level_num < 4:
+        if level_num < 4 or frag_cnt == 0:
             self.frag_box.setEnabled(0)
             self.frag_box.setStyleSheet("background-color: #8a8a8a")
             self.frag_box.setText("НЕДОСТУПНО")
@@ -66,9 +66,10 @@ class AssaultSettingsWindow(QWidget):
             self.frag_box.setText(f"Осталось {str(self.frag_cnt)} FRAG")
 
     def accept_settings(self):
-        self.chance = 100
+        self.chance += 100
         self.bonus = self.lethal_box.isChecked()
         if self.bonus:
+            self.bonus = 100
             self.chance -= 20
         self.use_frag = self.frag_box.isChecked()
         if self.use_frag:

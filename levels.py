@@ -23,12 +23,25 @@ def generate_level(level_num):
             "#bf.......#......###",
             "####################",
         ]
-        rooms = [
-            # TODO
-        ]
+        rooms = [2, 4, 2, 2]
 
     else:
         # Возвращаем пустой уровень
         return [], []
 
     return level, rooms
+
+
+def rooms_per_level(level_num):
+    """
+    Возвращает количество комнат на уровне.
+
+    Args:
+        level_num (int): Номер уровня.
+
+    Returns:
+        int: Количество комнат на уровне.
+    """
+    ans = [1, 4, 4, 4]
+
+    return ans[level_num - 1]

@@ -8,7 +8,7 @@ import saves
 
 pygame.init()
 
-from levels import generate_level
+from levels import generate_level, rooms_per_level
 from assault_settings import get_assault_settings
 
 
@@ -241,8 +241,9 @@ class Wall(pygame.sprite.Sprite):
 class Door(pygame.sprite.Sprite):
     img = "door.png"
     rotated = None
+    enemies = None
 
-    def __init__(self, pos_x, pos_y, rotated=False):
+    def __init__(self, pos_x, pos_y, enem, rotated=False):
         """
         Инициализирует спрайт двери.
 
@@ -253,6 +254,7 @@ class Door(pygame.sprite.Sprite):
 
         """
         self.rotated = rotated
+        self.enemies = enem
 
         super().__init__(act_doors_group, all_sprites, doors_group)
         if rotated:
@@ -307,12 +309,13 @@ class Room:
         self.enemies = enemies
 
 
-def draw_level(level):
+def draw_level(level, rooms):
     """
     Отрисовывает уровень на экране.
 
     Args:
         level (list): Карта уровня.
+        rooms (list): Противники в комнате
     """
     global player
     for y, row in enumerate(level):
@@ -324,9 +327,9 @@ def draw_level(level):
             elif cell == "b":
                 Floor(x, y, WHITE)
             elif cell == "d":
-                Door(x, y)
+                Door(x, y, rooms.pop())
             elif cell == "f":
-                Door(x, y, rotated=True)
+                Door(x, y, rooms.pop(), rotated=True)
             elif cell == "p":
                 coords = (x, y)
     player = Player(coords[0], coords[1])
@@ -398,8 +401,8 @@ def show_start_screen():
                     level_selected = user_level
                     waiting = False
                 elif event.key == pygame.K_r:
-                    level_selected = 2
-                    waiting = False
+                    saves.save(1)
+                    user_level = 1
                 elif event.key == pygame.K_m:
                     toggle_music(stop=1)
 
@@ -467,19 +470,19 @@ def to_white():
         clock.tick(FPS)
 
 
-def game_over_screen():
+def game_over_screen(text, color):
     """
-    Вывод надписи о поражении
+    Вывод надписи о завершении уровня
     """
     screen.fill(BLACK)
 
-    text_large = font_large.render("YOU DIED", True, RED)
+    text_large = font_large.render(text, True, color)
     text_rect_large = text_large.get_rect(
         center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 10)
     )
     screen.blit(text_large, text_rect_large)
 
-    text_small = font_small.render("нажми ESC для главного меню", True, RED)
+    text_small = font_small.render("нажми ESC для главного меню", True, color)
     text_rect_small = text_small.get_rect(
         center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)
     )
@@ -500,6 +503,7 @@ def main_game(level_num):
     FRAG = 2
     SCOUT = 2
     ROOMS_OK = 0
+    BONUS_IN_LEVEL = 0
 
     global player
 
@@ -510,7 +514,7 @@ def main_game(level_num):
         print(f"Уровень {level_num} не найден.")
         return
 
-    draw_level(level_map)
+    draw_level(level_map, rooms)
 
     while running:
         for event in pygame.event.get():
@@ -530,10 +534,11 @@ def main_game(level_num):
                         if distance > 90:
                             player.target_pos = mouse_pos
                         else:
-                            enemies = 2
+                            enemies = door.enemies
                             start, bonus, FRAG, SCOUT = get_assault_settings(
                                 level_num, FRAG, SCOUT, ROOMS_OK, enemies
                             )
+                            BONUS_IN_LEVEL += bonus
                             print(start)
                             if start:
                                 toggle_music("assualt", loop=1)
@@ -543,7 +548,7 @@ def main_game(level_num):
                                     print("You died!")
                                     toggle_music("fail", loop=1)
                                     pygame.time.wait(5000)
-                                    game_over_screen()
+                                    game_over_screen("YOU DIED", RED)
                                     while 1:
                                         for event in pygame.event.get():
                                             if event.type == pygame.QUIT:
@@ -557,7 +562,22 @@ def main_game(level_num):
                                     door.change_img("line.png")
                                     toggle_music("ok", loop=1)
                                     to_white()
-
+                                    if ROOMS_OK == rooms_per_level(level_num):
+                                        saves.save(level_num + 1)
+                                        toggle_music("complete", loop=1)
+                                        pygame.time.wait(2000)
+                                        game_over_screen(
+                                            f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
+                                            WHITE,
+                                        )
+                                        while 1:
+                                            for event in pygame.event.get():
+                                                if event.type == pygame.QUIT:
+                                                    pygame.quit()
+                                                elif event.type == pygame.KEYDOWN:
+                                                    if event.key == pygame.K_ESCAPE:
+                                                        clear_groups()
+                                                        return
                         break
                 else:
                     if player:

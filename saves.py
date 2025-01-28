@@ -19,3 +19,9 @@ def get_save():
 
     save.close()
     return level
+
+
+def save(level):
+    save = open(FILE, "w")
+    save.write(str(level))
+    save.close()
