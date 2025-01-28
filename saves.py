@@ -12,8 +12,8 @@ def get_save():
 
     try:
         level = int(save.read())
-        if level > 5:
-            level = 1
+        if level > 4:
+            level = 4
     except BaseException:
         level = 1
 

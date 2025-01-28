@@ -365,7 +365,8 @@ def show_start_screen():
                     waiting = False
                 elif event.key == pygame.K_r:
                     saves.save(1)
-                    user_level = 1
+                    level_selected = -1
+                    waiting = False
                 elif event.key == pygame.K_m:
                     toggle_music(stop=1)
 
@@ -535,17 +536,25 @@ def main_game(level_num):
                 else:
                     ROOMS_OK += 1
                     door.change_img("line.png")
-                    pygame.time.wait(1000)
+                    pygame.time.wait(1700)
                     toggle_music("ok", loop=1)
                     to_white()
                     if ROOMS_OK == rooms_per_level(level_num):
                         saves.save(level_num + 1)
-                        toggle_music("complete", loop=1)
-                        pygame.time.wait(2000)
-                        game_over_screen(
-                            f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
-                            WHITE,
-                        )
+                        if level_num != 4:
+                            toggle_music("complete", loop=1)
+                            pygame.time.wait(2000)
+                            game_over_screen(
+                                f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
+                                WHITE,
+                            )
+                        else:
+                            pygame.time.wait(1000)
+                            toggle_music("final", loop=1)
+                            game_over_screen(
+                                f"СПАСИБО ЗА ИГРУ |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
+                                WHITE,
+                            )
                         wait_time = 1000000000000000000
                     else:
                         waiting = False
@@ -568,7 +577,8 @@ def main():
     """
     while True:
         selected_level = show_start_screen()
-        main_game(selected_level)
+        if selected_level != -1:
+            main_game(selected_level)
 
 
 if __name__ == "__main__":

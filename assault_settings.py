@@ -34,16 +34,17 @@ class AssaultSettingsWindow(QWidget):
         self.chance = 0
         self.enem = enem
 
-        self.exit_but.clicked.connect(self.close)
+        self.exit_but.clicked.connect(self.exit)
         self.start_but.clicked.connect(self.accept_settings)
+        self.scout_but.clicked.connect(self.scout_f)
 
-        if level_num < 2:
+        if level_num < 3 or scout_cnt == 0:
             self.scout_cnt = 0
             self.scout_but.setEnabled(0)
             self.scout_but.setStyleSheet("background-color: #8a8a8a")
         self.scout_cnt_l.setText(f"Осталось {str(self.scout_cnt)} разведок")
 
-        if level_num < 3:
+        if level_num < 2:
             self.m1.setText("НЕДОСТУПНО")
             self.m2.setText("НЕДОСТУПНО")
         else:
@@ -77,6 +78,17 @@ class AssaultSettingsWindow(QWidget):
             self.frag_cnt -= 1
         self.chance -= self.enem * 10
         self.settings_accepted = True
+        self.close()
+
+    def scout_f(self):
+        self.scout_cnt -= 1
+        self.scout_cnt_l.setText(f"Осталось {str(self.scout_cnt)} разведок")
+        self.scout_res.setText(f"РЕЗУЛЬТАТ: {self.enem} врагов")
+        self.scout_but.setEnabled(0)
+        self.scout_but.setStyleSheet("background-color: #8a8a8a")
+
+    def exit(self):
+        self.chance = 0
         self.close()
 
 
