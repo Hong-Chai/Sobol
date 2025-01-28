@@ -42,6 +42,6 @@ def rooms_per_level(level_num):
     Returns:
         int: Количество комнат на уровне.
     """
-    ans = [1, 4, 4, 4]
+    ans = [4, 4, 4, 4]
 
     return ans[level_num - 1]

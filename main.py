@@ -47,28 +47,6 @@ pygame.mixer.init()
 music_playing = False
 
 
-"""TODO
-Функциональные требования:
-a. Общие функции:
-    i. Возможность свободно перемещать группу Соболь по нейтральным и зачищенным локациям
-    ii. Иметь систему коллизий
-    iii. Иметь систему анимации движения спецназовцев
-    iv. Окно настройки каждого отдельного штурма комнаты
-    v. Поэтапное открытие новых функций (см пункт б)
-    vi. Реалистичное звуковое сопровождение
-    vii. Обучение
-b. Функции с поэтапным открытием
-    i. Уровень 0 – обучение (только перемещение и слепой штурм)
-    ii. Уровень 1 – улучшения отряда
-    iii. Уровень 2 – возможность разведки противников в комнате (кол-во ограничено)
-    iv. Уровень 3 – режим нелетального штурма (больше очков)
-    v. Уровень 4 – гранаты и прочие примочки
-С. Главное меню
-    Возможность сбросить прогресс
-    Возможность отключить фоновую музыку
-"""
-
-
 def load_image(name, colorkey=None, scale=(TILE_SIZE, TILE_SIZE)):
     """
     Загружает изображение из директории data.
@@ -294,21 +272,6 @@ class Floor(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(TILE_SIZE * pos_x, TILE_SIZE * pos_y)
 
 
-class Room:
-    def __init__(self, pos_x, pos_y, enemies):
-        """
-        Инициализирует комнату.
-
-        Args:
-            pos_x (int): Координата x позиции комнаты.
-            pos_y (int): Координата y позиции комнаты.
-            enemies (list): Список врагов в комнате.
-        """
-        self.pos_x = pos_x
-        self.pos_y = pos_y
-        self.enemies = enemies
-
-
 def draw_level(level, rooms):
     """
     Отрисовывает уровень на экране.
@@ -516,7 +479,14 @@ def main_game(level_num):
 
     draw_level(level_map, rooms)
 
+    running = True
+    waiting = False  # Add this flag to control update/draw
+    wait_start = 0
+    wait_time = 16000
+
     while running:
+        current_time = pygame.time.get_ticks()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -524,7 +494,9 @@ def main_game(level_num):
                 if event.key == pygame.K_ESCAPE:
                     clear_groups()
                     return
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif (
+                event.type == pygame.MOUSEBUTTONDOWN and not waiting
+            ):  # Only process clicks if not waiting
                 mouse_pos = pygame.mouse.get_pos()
                 for door in act_doors_group:
                     if door.rect.collidepoint(mouse_pos):
@@ -540,54 +512,50 @@ def main_game(level_num):
                             )
                             BONUS_IN_LEVEL += bonus
                             print(start)
+
                             if start:
                                 toggle_music("assualt", loop=1)
                                 to_black()
-                                pygame.time.wait(11000)
-                                if start <= randint(1, 100):
-                                    print("You died!")
-                                    toggle_music("fail", loop=1)
-                                    pygame.time.wait(5000)
-                                    game_over_screen("YOU DIED", RED)
-                                    while 1:
-                                        for event in pygame.event.get():
-                                            if event.type == pygame.QUIT:
-                                                pygame.quit()
-                                            elif event.type == pygame.KEYDOWN:
-                                                if event.key == pygame.K_ESCAPE:
-                                                    clear_groups()
-                                                    return
-                                else:
-                                    ROOMS_OK += 1
-                                    door.change_img("line.png")
-                                    toggle_music("ok", loop=1)
-                                    to_white()
-                                    if ROOMS_OK == rooms_per_level(level_num):
-                                        saves.save(level_num + 1)
-                                        toggle_music("complete", loop=1)
-                                        pygame.time.wait(2000)
-                                        game_over_screen(
-                                            f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
-                                            WHITE,
-                                        )
-                                        while 1:
-                                            for event in pygame.event.get():
-                                                if event.type == pygame.QUIT:
-                                                    pygame.quit()
-                                                elif event.type == pygame.KEYDOWN:
-                                                    if event.key == pygame.K_ESCAPE:
-                                                        clear_groups()
-                                                        return
+                                waiting = True
+                                wait_start = current_time
                         break
                 else:
                     if player:
                         player.target_pos = mouse_pos
 
-        player_group.update()
+        if waiting:
+            if current_time - wait_start >= wait_time:
+                if start <= randint(1, 100):
+                    print("You died!")
+                    toggle_music("fail", loop=1)
+                    pygame.time.wait(4000)
+                    game_over_screen("YOU DIED", RED)
+                    wait_time = 1000000000000000000
 
-        screen.fill(WHITE)
-        all_sprites.draw(screen)
-        pygame.display.flip()
+                else:
+                    ROOMS_OK += 1
+                    door.change_img("line.png")
+                    pygame.time.wait(1000)
+                    toggle_music("ok", loop=1)
+                    to_white()
+                    if ROOMS_OK == rooms_per_level(level_num):
+                        saves.save(level_num + 1)
+                        toggle_music("complete", loop=1)
+                        pygame.time.wait(2000)
+                        game_over_screen(
+                            f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
+                            WHITE,
+                        )
+                        wait_time = 1000000000000000000
+                    else:
+                        waiting = False
+
+        else:
+            player_group.update()
+            screen.fill(WHITE)
+            all_sprites.draw(screen)
+            pygame.display.flip()
+
         clock.tick(FPS)
 
     pygame.quit()
