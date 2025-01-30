@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import math
 
 from random import randint
 
@@ -86,24 +87,18 @@ floor_group = pygame.sprite.Group()
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
-        """
-        Инициализирует спрайт игрока.
-
-        Args:
-            pos_x (int): Координата x начальной позиции игрока.
-            pos_y (int): Координата y начальной позиции игрока.
-        """
         super().__init__(player_group, all_sprites)
 
         self.frames = [
-            load_image(f"player{i}.png", scale=(50, 50))
-            for i in range(1, 7)  # Загрузка player1.png до player6.png
+            load_image(f"player{i}.png", scale=(50, 50)) for i in range(1, 7)
         ]
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
-        self.rect = self.image.get_rect().move(
-            TILE_SIZE * pos_x + 15, TILE_SIZE * pos_y + 5
-        )
+
+        self.x = TILE_SIZE * pos_x + 15
+        self.y = TILE_SIZE * pos_y + 5
+
+        self.rect = self.image.get_rect(topleft=(self.x, self.y))
         self.speed = 5
         self.target_pos = None
         self.animation_delay = 100
@@ -112,94 +107,95 @@ class Player(pygame.sprite.Sprite):
         self.facing_right = True
 
     def animate(self):
-        """Обновляет кадр анимации"""
         now = pygame.time.get_ticks()
         if self.is_moving:
+            # Анимация движения
             if now - self.last_update > self.animation_delay:
                 self.last_update = now
                 self.cur_frame = (self.cur_frame + 1) % len(self.frames)
-                current_frame = self.frames[self.cur_frame]
-                if not self.facing_right:
-                    self.image = pygame.transform.flip(current_frame, True, False)
-                else:
-                    self.image = current_frame
+                self.image = pygame.transform.flip(
+                    self.frames[self.cur_frame], not self.facing_right, False
+                )
         else:
-            # Сброс анимации на первый кадр, когда игрок стоит
-            self.cur_frame = 0
-            current_frame = self.frames[self.cur_frame]
-            if not self.facing_right:
-                self.image = pygame.transform.flip(current_frame, True, False)
-            else:
-                self.image = current_frame
+            # Статичный кадр с учетом направления
+            if self.cur_frame != 0:
+                self.cur_frame = 0
+                self.image = pygame.transform.flip(
+                    self.frames[0], not self.facing_right, False
+                )
 
     def update(self):
-        """
-        Обновляет позицию игрока на основе целевой позиции.
-        """
         if self.target_pos:
-            old_x, old_y = self.rect.x, self.rect.y  # старая позиция
+            self.is_moving = True  # Принудительно активируем анимацию
 
-            dx = self.target_pos[0] - self.rect.x
-            dy = self.target_pos[1] - self.rect.y
+            old_x, old_y = self.x, self.y
+            dx = self.target_pos[0] - self.x
+            dy = self.target_pos[1] - self.y
             distance = (dx**2 + dy**2) ** 0.5
 
-            if dx != 0:
-                self.facing_right = dx > 0
-
-            if distance > self.speed:
-                self.is_moving = True
+            if distance > 0:
+                self.facing_right = dx > 0  # Обновляем направление
                 move_x = dx / distance * self.speed
                 move_y = dy / distance * self.speed
-                # Попытка сдвинуть игрока по X
-                self.rect.x += move_x
-                if self.check_collisions():
-                    self.rect.x -= move_x  # Откат, если столкновение
-                    move_x = 0  # Не удалось двигаться по X
 
-                # Попытка сдвинуть игрока по Y
-                self.rect.y += move_y
-                if self.check_collisions():
-                    self.rect.y -= move_y  # Откат, если столкновение
-                    move_y = 0  # Не удалось двигаться по Y
-            else:
-                self.rect.x = self.target_pos[0]
-                self.rect.y = self.target_pos[1]
-                self.target_pos = None
-                self.is_moving = False
+                # Движение по X
+                new_x = self.x + move_x
+                self.rect.x = int(new_x)
+                if not self.check_collisions():
+                    self.x = new_x
+                else:
+                    self.rect.x = int(self.x)
 
-            # Проверяем, произошло ли какое-либо движение
-            if self.rect.x == old_x and self.rect.y == old_y:
-                # Если позиция не изменилась, сбрасываем движение
-                self.target_pos = None
-                self.is_moving = False
+                # Движение по Y
+                new_y = self.y + move_y
+                self.rect.y = int(new_y)
+                if not self.check_collisions():
+                    self.y = new_y
+                else:
+                    self.rect.y = int(self.y)
 
+                # Финализация позиции
+                self.rect.topleft = (int(self.x), int(self.y))
+                current_distance = (
+                    (self.target_pos[0] - self.x) ** 2
+                    + (self.target_pos[1] - self.y) ** 2
+                ) ** 0.5
+                if current_distance <= self.speed:
+                    self._try_finalize_movement()
+
+                # Проверка застревания
+                if abs(self.x - old_x) < 0.1 and abs(self.y - old_y) < 0.1:
+                    self.target_pos = None
         else:
-            self.is_moving = False  # Нет цели для движения
+            self.is_moving = False
 
         self.animate()
 
-    def check_collisions(self):
-        """
-        Проверяет столкновения со стенами и дверями.
+    def _try_finalize_movement(self):
+        self.x, self.y = self.target_pos
+        self.rect.topleft = (int(self.x), int(self.y))
 
-        Returns:
-            bool: True, если есть столкновение, False в противном случае.
-        """
+        if self.check_collisions():
+            self.x = self.rect.x
+            self.y = self.rect.y
+            self.target_pos = None
+        else:
+            self.target_pos = None
+
+    def check_collisions(self):
         return pygame.sprite.spritecollideany(
             self, walls_group
         ) or pygame.sprite.spritecollideany(self, doors_group)
 
     def move_to(self, x, y):
-        """
-        Устанавливает целевую позицию для движения игрока.
-
-        Args:
-            x (int): Целевая координата x (в пикселях).
-            y (int): Целевая координата y (в пикселях).
-        """
-        # Проверяем, находится ли целевая позиция в пределах карты
-        if 0 <= x <= SCREEN_WIDTH and 0 <= y <= SCREEN_HEIGHT:
-            self.target_pos = (x, y)
+        screen = pygame.display.get_surface()
+        if screen:
+            screen_width, screen_height = screen.get_size()
+            if (
+                0 <= x <= screen_width - self.rect.width
+                and 0 <= y <= screen_height - self.rect.height
+            ):
+                self.target_pos = (x, y)
 
 
 class Wall(pygame.sprite.Sprite):
@@ -434,7 +430,7 @@ def to_white():
         clock.tick(FPS)
 
 
-def game_over_screen(text, color):
+def game_over_screen(text, color, level):
     """
     Вывод надписи о завершении уровня
     """
@@ -446,9 +442,17 @@ def game_over_screen(text, color):
     )
     screen.blit(text_large, text_rect_large)
 
-    text_small = font_small.render("нажми ESC для главного меню", True, color)
+    text_small = font_small.render(
+        f"Лучший результат: {saves.read_score_for_level(level)}", True, color
+    )
     text_rect_small = text_small.get_rect(
         center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)
+    )
+    screen.blit(text_small, text_rect_small)
+
+    text_small = font_small.render("нажми ESC для главного меню", True, color)
+    text_rect_small = text_small.get_rect(
+        center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80)
     )
     screen.blit(text_small, text_rect_small)
 
@@ -483,7 +487,7 @@ def main_game(level_num):
     running = True
     waiting = False  # Add this flag to control update/draw
     wait_start = 0
-    wait_time = 16000
+    wait_time = 17000
 
     while running:
         current_time = pygame.time.get_ticks()
@@ -529,24 +533,37 @@ def main_game(level_num):
                 if start <= randint(1, 100):
                     print("You died!")
                     toggle_music("fail", loop=1)
-                    pygame.time.wait(4000)
-                    game_over_screen("YOU DIED", RED)
-                    wait_time = 1000000000000000000
+                    pygame.time.wait(1000)
+                    game_over_screen("YOU DIED", RED, level_num)
+                    wait_time = math.inf
 
                 else:
                     ROOMS_OK += 1
+
+                    # чтоб не втыкала
                     door.change_img("line.png")
-                    pygame.time.wait(1700)
+                    door.change_img("line.png")
+                    door.change_img("line.png")
+
                     toggle_music("ok", loop=1)
                     to_white()
                     if ROOMS_OK == rooms_per_level(level_num):
                         saves.save(level_num + 1)
+                        if (
+                            ROOMS_OK * 200 + BONUS_IN_LEVEL
+                            > saves.read_score_for_level(level_num)
+                        ):
+                            saves.write_score_for_level(
+                                level_num, ROOMS_OK * 200 + BONUS_IN_LEVEL
+                            )
+
                         if level_num != 4:
                             toggle_music("complete", loop=1)
-                            pygame.time.wait(2000)
+                            pygame.time.wait(1000)
                             game_over_screen(
                                 f"LEVEL COMPLETE |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
                                 WHITE,
+                                level_num,
                             )
                         else:
                             pygame.time.wait(1000)
@@ -554,8 +571,9 @@ def main_game(level_num):
                             game_over_screen(
                                 f"СПАСИБО ЗА ИГРУ |ОЧКИ {ROOMS_OK * 200 + BONUS_IN_LEVEL}/{ROOMS_OK * 200 + ROOMS_OK * 100}|",
                                 WHITE,
+                                level_num,
                             )
-                        wait_time = 1000000000000000000
+                        wait_time = math.inf
                     else:
                         waiting = False
 
