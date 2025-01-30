@@ -229,6 +229,8 @@ class Door(pygame.sprite.Sprite):
         """
         self.rotated = rotated
         self.enemies = enem
+        self.x = pos_x
+        self.y = pos_y
 
         super().__init__(act_doors_group, all_sprites, doors_group)
         if rotated:
@@ -250,6 +252,37 @@ class Door(pygame.sprite.Sprite):
             self.image = pygame.transform.rotate(load_image(self.img), 90)
         else:
             self.image = load_image(self.img)
+
+
+# ЧЕРЕЗ НАСЛЕДСТВО ПРОБОВАЛ, ВСЕ РАВНО БАГАЛОСЬ, ТОЛьКО ТАК РАБОТАЕТ
+
+
+class Door_line(pygame.sprite.Sprite):
+    img = "line.png"
+    rotated = None
+    enemies = None
+
+    def __init__(self, pos_x, pos_y, enem, rotated=False):
+        """
+        Инициализирует спрайт двери.
+
+        Args:
+            pos_x (int): Координата x позиции двери.
+            pos_y (int): Координата y позиции двери.
+            rotated (bool, optional): Ориентация двери (по умолчанию False - горизонтальная).
+
+        """
+        self.rotated = rotated
+        self.enemies = enem
+        self.x = pos_x
+        self.y = pos_y
+
+        super().__init__(act_doors_group, all_sprites, doors_group)
+        if rotated:
+            self.image = pygame.transform.rotate(load_image(self.img), 90)
+        else:
+            self.image = load_image(self.img)
+        self.rect = self.image.get_rect().move(TILE_SIZE * pos_x, TILE_SIZE * pos_y)
 
 
 class Floor(pygame.sprite.Sprite):
@@ -541,9 +574,8 @@ def main_game(level_num):
                     ROOMS_OK += 1
 
                     # чтоб не втыкала
-                    door.change_img("line.png")
-                    door.change_img("line.png")
-                    door.change_img("line.png")
+                    door1 = Door_line(door.x, door.y, door.enemies, door.rotated)
+                    door.kill()
 
                     toggle_music("ok", loop=1)
                     to_white()
