@@ -104,6 +104,9 @@ def get_assault_settings(level_num, frag_cnt, scout_cnt, rooms_ok_cnt, enem):
     while not window.settings_accepted and window.isVisible():
         app.processEvents()
 
+    if not window.settings_accepted:
+        window.chance = 0
+
     return (
         window.chance,
         window.bonus,
